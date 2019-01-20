@@ -1,7 +1,12 @@
 [package]
-name = "st7735-rs"
+name = "st7735"
 version = "0.1.0"
 authors = ["anna <anna@scholtzan.net>"]
 edition = "2018"
 
 [dependencies]
+spidev = "0.3.0"
+sysfs_gpio = "0.5"
+num-traits = "0.2"
+num-derive = "0.2"
+num = "0.2"
