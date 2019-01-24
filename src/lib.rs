@@ -15,19 +15,24 @@ use sysfs_gpio::{Direction, Pin};
 use std::thread::sleep;
 use std::time::Duration;
 use std::mem::transmute;
+use std::io;
+use std::io::prelude::*;
 
 pub struct ST7734 {
     /// Reset pin.
     rst: Option<Pin>,
 
     /// SPI clock pin.
-    clk: Pin,
+    clk: Option<Pin>,
 
     /// Data/command pin.
-    dc: Pin,
+    dc: Option<Pin>,
 
     /// MOSI pin.
-    mosi: Pin,
+    mosi: Option<Pin>,
+
+    /// Hardware SPI
+    spi: Option<Spidev>,
 }
 
 #[derive(FromPrimitive, ToPrimitive)]
@@ -128,12 +133,38 @@ pub struct Command {
 
 
 impl ST7734 {
+    pub fn new_with_spi(spi: &str, dc: u64) -> ST7734 {
+        let mut spi = Spidev::open(spi).expect("error initializing SPI");
+        let options = SpidevOptions::new()
+            .bits_per_word(8)
+            .max_speed_hz(20000000)
+            .mode(SPI_MODE_0)
+            .build();
+        spi.configure(&options).expect("error configuring SPI");
+
+        let dc_pin = Pin::new(dc);
+        dc_pin.set_direction(Direction::Out);
+
+        let mut display = ST7734 {
+            rst: None,
+            clk: None,
+            dc: Some(dc_pin),
+            mosi: None,
+            spi: Some(spi),
+        };
+
+        display.init();
+        display
+    }
+
     pub fn new(rst: Option<u64>, clk: u64, dc: u64, mosi: u64) -> ST7734 {
         let clk_pin = Pin::new(clk);
         clk_pin.set_direction(Direction::Out);
         clk_pin.set_value(0).expect("error while setting clock 0");
+
         let dc_pin = Pin::new(dc);
         dc_pin.set_direction(Direction::Out);
+
         let mosi_pin = Pin::new(mosi);
         mosi_pin.set_direction(Direction::Out);
 
@@ -146,18 +177,19 @@ impl ST7734 {
             None => None
         };
 
-        let display = ST7734 {
+        let mut display = ST7734 {
             rst: rst_pin,
-            clk: clk_pin,
-            dc: dc_pin,
-            mosi: mosi_pin,
+            clk: Some(clk_pin),
+            dc: Some(dc_pin),
+            mosi: Some(mosi_pin),
+            spi: None,
         };
 
         display.init();
         display
     }
 
-    pub fn init(&self) {
+    pub fn init(&mut self) {
         let init_commands: Vec<Command> = vec![
             Command { instruction: Instruction::SWRESET, delay: Some(200), arguments: vec![] },
             Command { instruction: Instruction::SLPOUT, delay: Some(200), arguments: vec![] },
@@ -168,38 +200,43 @@ impl ST7734 {
     }
 
     fn pulse_clock(&self) {
-        self.clk.set_value(1).expect("error while pulsing clock");
-        self.clk.set_value(0).expect("error while pulsing clock");
+        self.clk.unwrap().set_value(1).expect("error while pulsing clock");
+        self.clk.unwrap().set_value(0).expect("error while pulsing clock");
     }
 
-    fn write_byte(&self, value: u8, data: bool) {
+    fn write_byte(&mut self, value: u8, data: bool) {
         let mode = match data {
             false => 0,
             true => 1
         };
 
-        self.dc.set_value(mode).expect("error while writing byte");
+        self.dc.unwrap().set_value(mode).expect("error while writing byte");
 
-        let mask = 0x80;
-        for bit in 0..8 {
-            self.mosi.set_value(value & (mask >> bit));
-            self.pulse_clock();
+        if let Some(ref mut spi) = self.spi {
+            spi.write(&[value]);
+        } else {
+            let mask = 0x80;
+            for bit in 0..8 {
+                self.mosi.unwrap().set_value(value & (mask >> bit));
+                self.pulse_clock();
+            }
         }
+
     }
 
-    fn write_word(&self, value: u16) {
+    fn write_word(&mut self, value: u16) {
         let bytes: [u8; 2] = unsafe { transmute(value.to_be()) };
         self.write_byte(bytes[0], true);
         self.write_byte(bytes[1], true);
     }
 
-    fn execute_commands(&self, commands: Vec<Command>) {
+    fn execute_commands(&mut self, commands: Vec<Command>) {
         for cmd in &commands {
             self.execute_command(cmd);
         }
     }
 
-    fn execute_command(&self, cmd: &Command) {
+    fn execute_command(&mut self, cmd: &Command) {
         self.write_byte(num::ToPrimitive::to_u8(&cmd.instruction).unwrap(), false);
 
         match cmd.delay {
@@ -216,14 +253,20 @@ impl ST7734 {
         }
     }
 
-    fn write_color(&self, color: u32) {
+    fn write_color(&mut self, color: u32) {
         let bytes: [u8; 4] = unsafe { transmute(color.to_be()) };
-        self.write_byte(bytes[1], true);
-        self.write_byte(bytes[2], true);
-        self.write_byte(bytes[3], true);
+
+        if let Some(ref mut spi) = self.spi {
+            self.dc.unwrap().set_value(1).expect("error while writing byte");
+            spi.write(&[bytes[1], bytes[2], bytes[3]]);
+        } else {
+            self.write_byte(bytes[1], true);
+            self.write_byte(bytes[2], true);
+            self.write_byte(bytes[3], true);
+        }
     }
 
-    fn set_address_window(&self, x0: u16, y0: u16, x1: u16, y1: u16) {
+    fn set_address_window(&mut self, x0: u16, y0: u16, x1: u16, y1: u16) {
         self.write_byte(num::ToPrimitive::to_u8(&Instruction::CASET).unwrap(), false);
         self.write_word(x0);
         self.write_word(x1);
@@ -232,13 +275,13 @@ impl ST7734 {
         self.write_word(y1);
     }
 
-    pub fn draw_pixel(&self, x: u16, y: u16, color: u32) {
+    pub fn draw_pixel(&mut self, x: u16, y: u16, color: u32) {
         self.set_address_window(x, y, x, y);
         self.write_byte(num::ToPrimitive::to_u8(&Instruction::RAMWR).unwrap(), false);
         self.write_color(color);
     }
 
-    pub fn draw_rect(&self, x0: u16, y0: u16, x1: u16, y1: u16, color: u32) {
+    pub fn draw_rect(&mut self, x0: u16, y0: u16, x1: u16, y1: u16, color: u32) {
         let width = x1 - x0 + 1;
         let height = y1 - y0 + 1;
         self.set_address_window(x0, y0, x1, y1);
@@ -248,11 +291,11 @@ impl ST7734 {
         }
     }
 
-    pub fn fill_screen(&self, color: u32) {
+    pub fn fill_screen(&mut self, color: u32) {
         self.draw_rect(0, 0, 127, 159, color);
     }
 
-    pub fn clear_screen(&self) {
+    pub fn clear_screen(&mut self) {
         self.draw_rect(0, 0, 127, 159, 0x0);
     }
 }
