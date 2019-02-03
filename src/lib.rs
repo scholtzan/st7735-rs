@@ -10,13 +10,14 @@
 extern crate num_derive;
 
 use num;
-use spidev::{Spidev, SpidevOptions, SpidevTransfer, SPI_MODE_0};
+use spidev::{Spidev, SpidevOptions, SPI_MODE_0};
 use sysfs_gpio::{Direction, Pin};
 use std::thread::sleep;
 use std::time::Duration;
 use std::mem::transmute;
-use std::io;
 use std::io::prelude::*;
+use num::integer::sqrt;
+use std::cmp::{min, max};
 
 pub struct ST7734 {
     /// Reset pin.
@@ -288,6 +289,77 @@ impl ST7734 {
         self.write_byte(num::ToPrimitive::to_u8(&Instruction::RAMWR).unwrap(), false);
         for i in 0..(width * height) {
             self.write_color(color);
+        }
+    }
+
+    pub fn draw_horizontal_line(&mut self, x0: u16, x1: u16, y: u16, color: u32) {
+        let length = x1 - x0 + 1;
+        self.set_address_window(x0, y, x1, y);
+        self.write_byte(num::ToPrimitive::to_u8(&Instruction::RAMWR).unwrap(), false);
+        // todo: move to draw pixel
+        for i in 0..length {
+            self.write_color(color);
+        }
+    }
+
+    pub fn draw_vertical_line(&mut self, x: u16, y0: u16, y1: u16, color: u32) {
+        let length = y1 - y0 + 1;
+        self.set_address_window(x, y0, x, y1);
+        self.write_byte(num::ToPrimitive::to_u8(&Instruction::RAMWR).unwrap(), false);
+
+        // todo: move to draw pixel
+        for i in 0..length {
+            self.write_color(color);
+        }
+    }
+
+    pub fn draw_line(&mut self, x0: u16, y0: u16, x1: u16, y1: u16, color: u32) {
+        if x0 == x1 {
+            self.draw_vertical_line(x0, y0, y1, color);
+        } else if y0 == y1 {
+            self.draw_horizontal_line(x0, x1, y1, color);
+        } else {
+            let m = ((max(y1, y0) - min(y0, y1)) as f32) / ((max(x1, x0) - min(x0, x1)) as f32);
+
+            if m < 1.0 {
+                for x in x0..=x1 {
+                    let y = ((x - x0) as f32) * m + (y0 as f32);
+                    self.draw_pixel(x, y as u16, color);
+                }
+            } else {
+                for y in y0..=y1 {
+                    let x = ((y - y0) as f32) / m + (x0 as f32);
+                    self.draw_pixel(x as u16, y, color);
+                }
+            }
+        }
+    }
+
+    pub fn draw_circle(&mut self, x_pos: u16, y_pos: u16, radius: u16, color: u32) {
+        let x_end = ((0.7071 * (radius as f32)) + 1.0) as u16;
+
+        for x in 0..x_end {
+            let y = sqrt(radius * radius - x * x) as u16;
+            let u_x = x as u16;
+            self.draw_pixel(x_pos + u_x, y_pos + y, color);
+            self.draw_pixel(x_pos + u_x, y_pos - y, color);
+            self.draw_pixel(x_pos - u_x, y_pos + y, color);
+            self.draw_pixel(x_pos - u_x, y_pos - y, color);
+            self.draw_pixel(x_pos + y, y_pos + u_x, color);
+            self.draw_pixel(x_pos + y, y_pos - u_x, color);
+            self.draw_pixel(x_pos - y, y_pos + u_x, color);
+            self.draw_pixel(x_pos - y, y_pos - u_x, color);
+        }
+    }
+
+    pub fn draw_filled_circle(&mut self, x_pos: u16, y_pos: u16, radius: u16, color: u32) {
+        let r2 = radius * radius;
+        for x in 0..radius {
+            let y = sqrt(r2 - x * x);
+            let y0 = y_pos - y;
+            let y1 = y_pos + y;
+            self.draw_vertical_line(x_pos + x, y0, y1, color);
+            self.draw_vertical_line(x_pos - x, y0, y1, color);
         }
     }
 
