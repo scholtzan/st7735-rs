@@ -19,6 +19,8 @@ use std::io::prelude::*;
 use num::integer::sqrt;
 use std::cmp::{min, max};
 
+mod font57;
+
 pub struct ST7734 {
     /// Reset pin.
     rst: Option<Pin>,
@@ -360,6 +362,26 @@ impl ST7734 {
             let y1 = y_pos + y;
             self.draw_vertical_line(x_pos + x, y0, y1, color);
             self.draw_vertical_line(x_pos - x, y0, y1, color);
+        }
+    }
+
+    pub fn draw_character(&mut self, c: char, x: u16, y: u16, color: u32) {
+        let character_data = font57::Font57::get_char(c);
+        eprintln!("{:?}", character_data);
+
+        let mut mask = 0x01;
+
+        for row in 0..7 {
+            for col in 0..5 {
+                let bit = character_data[col] & (mask << row);
+
+                eprintln!("-");
+
+                if bit != 0 {
+                    eprintln!("{:?} {:?}", row, col);
+                    self.draw_pixel(x - (col as u16), y - (row as u16), color);
+                }
+            }
         }
     }
 
