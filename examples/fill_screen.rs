@@ -1,4 +1,5 @@
-use st7735::ST7734;
+extern crate st7735;
+use st7735::st7735::ST7734;
 use std::thread::sleep;
 use std::time::Duration;
 

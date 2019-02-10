@@ -1,3 +1,5 @@
+use crate::fonts::Font;
+
 // https://github.com/noopkat/oled-font-5x7/blob/master/oled-font-5x7.js
 static FONT57: &'static [u8] = &[
 0x00, 0x00, 0x00, 0x00, 0x00, // (space)
@@ -117,8 +119,8 @@ static LOOKUP57: &'static [char] = &[' ', '!', '"', '#', '$', '%', '&', '\'', '(
 
 pub struct Font57 { }
 
-impl Font57 {
-    pub fn get_char(c: char) -> Vec<u8> {
+impl Font for Font57 {
+    fn get_char(c: char) -> Vec<u8> {
         let index = LOOKUP57.iter().position(|&r| r == c).expect("Invalid char") * 5;
         FONT57[index..=(index + 5)].to_vec()
     }
