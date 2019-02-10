@@ -55,6 +55,15 @@ pub struct ST7734 {
     spi: Option<Spidev>,
 }
 
+/// Display orientation.
+#[derive(FromPrimitive, ToPrimitive)]
+pub enum Orientation {
+    Portrait = 0x00,
+    Landscape = 0x60,
+    PortraitSwapped = 0xC0,
+    LandScapeSwapped = 0xA0,
+}
+
 impl ST7734 {
     /// Creates a new driver instance that uses hardware SPI.
     ///
@@ -244,6 +253,24 @@ impl ST7734 {
         self.write_byte(num::ToPrimitive::to_u8(&Instruction::RASET).unwrap(), false);
         self.write_word(y0);
         self.write_word(y1);
+    }
+
+    /// Changes the display orientation.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// let display = ST7734::new(None, 24, 25, 23);
+    /// display.set_orientation(&Orientation::Portrait);
+    /// ```
+    ///
+    pub fn set_orientation(&mut self, orientation: &Orientation) {
+        let command = Command {
+            instruction: Instruction::MADCTL,
+            delay: None,
+            arguments: vec![num::ToPrimitive::to_u8(orientation).unwrap()],
+        };
+        self.execute_command(&command);
     }
 
     /// Draws a single pixel with the specified `color` at the defined coordinates on the display.
