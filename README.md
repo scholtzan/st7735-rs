@@ -16,13 +16,13 @@ See `examples`.
 
 ## Roadmap
 
-- [] Better color support
-- [] Documentation
-- [] Additional examples
-- [] More fonts
-- [] Better performance
-- [] Add support for reading SD card
-- [] Draw bitmaps 
+* Better color support
+* Documentation
+* Additional examples
+* More fonts
+* Better performance
+* Add support for reading SD card
+* Draw bitmaps 
 
 ## License
 
