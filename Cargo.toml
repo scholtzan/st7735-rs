@@ -1,10 +1,12 @@
 [package]
 name = "st7735"
+description = "Rust library for displays using the ST7735 driver"
 version = "0.1.0"
 authors = ["Anna Scholtz <anna@scholtzan.net>"]
 edition = "2018"
 license = "MIT"
 repository = "https://github.com/scholtzan/st7735-rs"
+default-target = "arm-unknown-linux-gnueabi "
 
 [dependencies]
 spidev = "0.3.0"
