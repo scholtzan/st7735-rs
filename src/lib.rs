@@ -6,7 +6,6 @@
 //! # Examples
 //!
 //! [todo]
-
 #[macro_use]
 extern crate num_derive;
 
@@ -14,10 +13,10 @@ pub mod color;
 pub mod command;
 pub mod fonts;
 
+use crate::color::{Color, DefaultColor};
 use crate::command::{Command, Instruction};
 use crate::fonts::font57::Font57;
 use crate::fonts::Font;
-use crate::color::{Color, DefaultColor};
 use num;
 use num::integer::sqrt;
 use spidev::{Spidev, SpidevOptions, SPI_MODE_0};
@@ -75,7 +74,6 @@ impl ST7734 {
     /// ```
     ///
     pub fn new_with_spi(spi: &str, dc: u64) -> ST7734 {
-        // todo: make SPI options configurable
         let mut spi = Spidev::open(spi).expect("error initializing SPI");
         let options = SpidevOptions::new()
             .bits_per_word(8)
@@ -153,8 +151,73 @@ impl ST7734 {
                 arguments: vec![],
             },
             Command {
+                instruction: Instruction::COLMOD,
+                delay: None,
+                arguments: vec![0x05],
+            },
+            Command {
+                instruction: Instruction::FRMCTR1,
+                delay: None,
+                arguments: vec![0x01, 0x2C, 0x2D],
+            },
+            Command {
+                instruction: Instruction::FRMCTR2,
+                delay: None,
+                arguments: vec![0x01, 0x2C, 0x2D],
+            },
+            Command {
+                instruction: Instruction::FRMCTR3,
+                delay: None,
+                arguments: vec![0x01, 0x2C, 0x2D, 0x01, 0x2C, 0x2D],
+            },
+            Command {
+                instruction: Instruction::INVCTR,
+                delay: None,
+                arguments: vec![0x07],
+            },
+            Command {
+                instruction: Instruction::PWCTR1,
+                delay: None,
+                arguments: vec![0xA2, 0x02, 0x84],
+            },
+            Command {
+                instruction: Instruction::PWCTR2,
+                delay: None,
+                arguments: vec![0xC5],
+            },
+            Command {
+                instruction: Instruction::PWCTR3,
+                delay: None,
+                arguments: vec![0x0A, 0x00],
+            },
+            Command {
+                instruction: Instruction::PWCTR4,
+                delay: None,
+                arguments: vec![0x8A, 0x2A],
+            },
+            Command {
+                instruction: Instruction::PWCTR5,
+                delay: None,
+                arguments: vec![0x8A, 0xEE],
+            },
+            Command {
+                instruction: Instruction::VMCTR1,
+                delay: None,
+                arguments: vec![0x0E],
+            },
+            Command {
+                instruction: Instruction::INVOFF,
+                delay: None,
+                arguments: vec![],
+            },
+            Command {
+                instruction: Instruction::MADCTL,
+                delay: None,
+                arguments: vec![0xC8],
+            },
+            Command {
                 instruction: Instruction::DISPON,
-                delay: Some(100),
+                delay: None,
                 arguments: vec![],
             },
         ];
@@ -162,7 +225,7 @@ impl ST7734 {
         self.execute_commands(init_commands);
     }
 
-    /// Pluses the clock one time.
+    /// Pulses the clock one time.
     fn pulse_clock(&self) {
         self.clk
             .unwrap()
@@ -193,6 +256,35 @@ impl ST7734 {
             for bit in 0..8 {
                 self.mosi.unwrap().set_value(value & (mask >> bit));
                 self.pulse_clock();
+            }
+        }
+    }
+
+    /// Writes a bulk of pixels to the display.
+    fn write_bulk(&mut self, color: &Color, repetitions: u16, count: u16) {
+        self.dc
+            .unwrap()
+            .set_value(0)
+            .expect("error while writing byte");
+        self.write_byte(num::ToPrimitive::to_u8(&Instruction::RAMWR).unwrap(), false);
+
+        for _ in 0..=count {
+            if let Some(ref mut spi) = self.spi {
+                self.dc
+                    .unwrap()
+                    .set_value(1)
+                    .expect("error while writing byte");
+                let bytes: [u8; 2] = unsafe { transmute(color.hex.to_be()) };
+                let mut byte_array = vec![bytes[0], bytes[1]];
+
+                for _ in 0..=repetitions {
+                    byte_array = [&byte_array[..], &bytes[..]].concat()
+                }
+                spi.write(&byte_array);
+            } else {
+                for _ in 0..=repetitions {
+                    self.write_color(color);
+                }
             }
         }
     }
@@ -231,18 +323,17 @@ impl ST7734 {
 
     /// Sets the color to be used.
     fn write_color(&mut self, color: &Color) {
-        let bytes: [u8; 4] = unsafe { transmute(color.hex.to_be()) };
+        let bytes: [u8; 2] = unsafe { transmute(color.hex.to_be()) };
 
         if let Some(ref mut spi) = self.spi {
             self.dc
                 .unwrap()
                 .set_value(1)
                 .expect("error while writing byte");
-            spi.write(&[bytes[1], bytes[2], bytes[3]]);
+            spi.write(&[bytes[0], bytes[1]]);
         } else {
+            self.write_byte(bytes[0], true);
             self.write_byte(bytes[1], true);
-            self.write_byte(bytes[2], true);
-            self.write_byte(bytes[3], true);
         }
     }
 
@@ -289,7 +380,23 @@ impl ST7734 {
         self.write_color(color);
     }
 
-    /// Draws a rectangle with the specified `color` on the display.
+    /// Draws a filled rectangle with the specified `color` on the display.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// let display = ST7734::new(None, 24, 25, 23);
+    /// display.draw_filled_rect(50, 20, 80, 40, 0xFF0000);
+    /// ```
+    ///
+    pub fn draw_filled_rect(&mut self, x0: u16, y0: u16, x1: u16, y1: u16, color: &Color) {
+        let width = x1 - x0 + 1;
+        let height = y1 - y0 + 1;
+        self.set_address_window(x0, y0, x1, y1);
+        self.write_bulk(color, width, height);
+    }
+
+    /// Draws a rectangle with the specified `color` as border color on the display.
     ///
     /// # Example
     ///
@@ -301,11 +408,10 @@ impl ST7734 {
     pub fn draw_rect(&mut self, x0: u16, y0: u16, x1: u16, y1: u16, color: &Color) {
         let width = x1 - x0 + 1;
         let height = y1 - y0 + 1;
-        self.set_address_window(x0, y0, x1, y1);
-        self.write_byte(num::ToPrimitive::to_u8(&Instruction::RAMWR).unwrap(), false);
-        for i in 0..(width * height) {
-            self.write_color(color);
-        }
+        self.draw_horizontal_line(x0, x1, y0, color);
+        self.draw_horizontal_line(x0, x1, y1, color);
+        self.draw_vertical_line(x0, y0, y1, color);
+        self.draw_vertical_line(x1, y0, y1, color);
     }
 
     /// Draws a horizontal with the specified `color` between the provided coordinates on the display.
@@ -320,11 +426,7 @@ impl ST7734 {
     pub fn draw_horizontal_line(&mut self, x0: u16, x1: u16, y: u16, color: &Color) {
         let length = x1 - x0 + 1;
         self.set_address_window(x0, y, x1, y);
-        self.write_byte(num::ToPrimitive::to_u8(&Instruction::RAMWR).unwrap(), false);
-        // todo: move to draw pixel
-        for i in 0..length {
-            self.write_color(color);
-        }
+        self.write_bulk(color, length, 1);
     }
 
     /// Draws a vertical with the specified `color` between the provided coordinates on the display.
@@ -339,12 +441,7 @@ impl ST7734 {
     pub fn draw_vertical_line(&mut self, x: u16, y0: u16, y1: u16, color: &Color) {
         let length = y1 - y0 + 1;
         self.set_address_window(x, y0, x, y1);
-        self.write_byte(num::ToPrimitive::to_u8(&Instruction::RAMWR).unwrap(), false);
-
-        // todo: move to draw pixel
-        for i in 0..length {
-            self.write_color(color);
-        }
+        self.write_bulk(color, length, 1);
     }
 
     /// Draws a line with the specified `color` between the provided coordinates on the display.
@@ -459,7 +556,7 @@ impl ST7734 {
     /// ```
     ///
     pub fn fill_screen(&mut self, color: &Color) {
-        self.draw_rect(0, 0, 127, 159, color);
+        self.draw_filled_rect(0, 0, 127, 159, color);
     }
 
     /// Fills the entire screen black.
@@ -472,53 +569,6 @@ impl ST7734 {
     /// ```
     ///
     pub fn clear_screen(&mut self) {
-        self.draw_rect(0, 0, 127, 159, &Color::from_default(DefaultColor::Black));
+        self.draw_filled_rect(0, 0, 127, 159, &Color::from_default(DefaultColor::Black));
     }
 }
-
-//https://github.com/arduino-libraries/TFT/blob/master/src/utility/Adafruit_ST7735.cpp
-
-//const RCMD1: Vec<Command> = vec![
-//    Command { instruction: Instruction::SWRESET, delay: true, arguments: [150]},
-//    Command { instruction: Instruction::SLPOUT, delay: true, arguments: [255]},
-//    Command { instruction: Instruction::FRMCTR1, delay: false, arguments: [0x01, 0x2C, 0x2D]},
-//    Command { instruction: Instruction::FRMCTR2, delay: false, arguments: [0x01, 0x2C, 0x2D]},
-//    Command { instruction: Instruction::FRMCTR3, delay: false, arguments: [0x01, 0x2C, 0x2D, 0x01, 0x2C, 0x2D]},
-//    Command { instruction: Instruction::INVCTR, delay: false, arguments: [0x07]},
-//    Command { instruction: Instruction::PWCTR1, delay: false, arguments: [0xA2, 0x02, 0x84]},
-//    Command { instruction: Instruction::PWCTR2, delay: false, arguments: [0xC5]},
-//    Command { instruction: Instruction::PWCTR3, delay: false, arguments: [0x0A, 0x00]},
-//    Command { instruction: Instruction::PWCTR4, delay: false, arguments: [0x8A, 0x2A]},
-//    Command { instruction: Instruction::PWCTR5, delay: false, arguments: [0x8A, 0xEE]},
-//    Command { instruction: Instruction::VMCTR1, delay: false, arguments: [0x0E]},
-//    Command { instruction: Instruction::INVOFF, delay: false, arguments: []},
-//    Command { instruction: Instruction::MADCTL, delay: false, arguments: [0xC8]},
-//    Command { instruction: Instruction::COLMOD, delay: false, arguments: [0x05]},
-//];
-//
-//const RCMD2_GREEN: Vec<Command> = vec![
-//    Command { instruction: Instruction::CASET, delay: false, arguments: [0x00, 0x02, 0x00, 0x7F+0x02]},
-//    Command { instruction: Instruction::RASET, delay: false, arguments: [0x00, 0x01, 0x00, 0x9F+0x01]},
-//];
-//
-//const RCMD2_RED: Vec<Command> = vec![
-//    Command { instruction: Instruction::CASET, delay: false, arguments: [0x00, 0x00, 0x00, 0x7F]},
-//    Command { instruction: Instruction::RASET, delay: false, arguments: [0x00, 0x00, 0x00, 0x9F]},
-//];
-//
-//const RCMD2_GREEN144: Vec<Command> = vec![
-//    Command { instruction: Instruction::CASET, delay: false, arguments: [0x00, 0x00, 0x00, 0x7F]},
-//    Command { instruction: Instruction::RASET, delay: false, arguments: [0x00, 0x00, 0x00, 0x7F]},
-//];
-//
-//const RCMD2_GREEN160X80: Vec<Command> = vec![
-//    Command { instruction: Instruction::CASET, delay: false, arguments: [0x00, 0x00, 0x00, 0x7F]},
-//    Command { instruction: Instruction::RASET, delay: false, arguments: [0x00, 0x00, 0x00, 0x9F]},
-//];
-//
-//const RCMD3: Vec<Command> = vec![
-//    Command { instruction: Instruction::GMCTRP1, delay: false, arguments: [0x02, 0x1c, 0x07, 0x12, 0x37, 0x32, 0x29, 0x2d, 0x29, 0x25, 0x2B, 0x39, 0x00, 0x01, 0x03, 0x10]},
-//    Command { instruction: Instruction::GMCTRN1, delay: false, arguments: [0x03, 0x1d, 0x07, 0x06, 0x2E, 0x2C, 0x29, 0x2D, 0x2E, 0x2E, 0x37, 0x3F, 0x00, 0x00, 0x02, 0x10]},
-//    Command { instruction: Instruction::NORON, delay: true, arguments: [10]},
-//    Command { instruction: Instruction::DISPON, delay: true, arguments: [100]},
-//];

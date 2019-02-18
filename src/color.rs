@@ -2,7 +2,7 @@ use num;
 
 /// Represents a pixel color.
 pub struct Color {
-    pub hex: u32
+    pub hex: u16,
 }
 
 impl Color {
@@ -13,10 +13,8 @@ impl Color {
     /// ```
     /// let color_green = Color::from_hex(0x00FF00);
     /// ```
-    pub fn from_hex(hex: u32) -> Color {
-        Color {
-            hex
-        }
+    pub fn from_hex(hex: u16) -> Color {
+        Color { hex }
     }
 
     /// Create color from a `DefaultColor`.
@@ -28,7 +26,7 @@ impl Color {
     /// ```
     pub fn from_default(default_color: DefaultColor) -> Color {
         Color {
-            hex: num::ToPrimitive::to_u32(&default_color).unwrap()
+            hex: num::ToPrimitive::to_u16(&default_color).unwrap(),
         }
     }
 
@@ -39,12 +37,12 @@ impl Color {
     /// ```
     /// let color_red = Color::from_rgb(255, 0, 0);
     /// ```
-    pub fn from_rgb(red: u32, green: u32, blue: u32) -> Color {
+    pub fn from_rgb(red: u16, green: u16, blue: u16) -> Color {
         let r = red & 0x1F;
         let g = green & 0x3F;
         let b = blue & 0x1F;
         Color {
-            hex: (r << 16) + (g << 8) + b
+            hex: (r << 11) + (g << 5) + b,
         }
     }
 }
@@ -52,10 +50,10 @@ impl Color {
 /// Set of hex values for default colors.
 #[derive(FromPrimitive, ToPrimitive)]
 pub enum DefaultColor {
-    Black = 0x000000,
-    White = 0xFFFFFF,
-    Red = 0xFF0000,
-    Green = 0x00FF00,
-    Blue = 0x0000FF,
+    Black = 0x0000,
+    White = 0xFFFF,
+    Red = 0xF800,
+    Green = 0x0400,
+    Blue = 0x001F,
     // todo
 }
