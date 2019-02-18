@@ -1,11 +1,26 @@
 #![crate_type = "lib"]
 #![crate_name = "st7735"]
 
-//! This create provides a ST7735 driver to connect to TFT displays.
+//! This crate provides a ST7735 driver to connect to TFT displays.
+//!
+//! Currently, there is support for using hardware SPI as well as software SPI to
+//! communicate to the display. Note that using hardware SPI is much faster and
+//! recommended to be used if supported by the connecting device.
+//!
+//! The driver also provides a simple graphics library which currently supports drawing the
+//! following shapes:
+//! * Rectangles (filled and border only)
+//! * Circles (filled and border only)
+//! * Lines (horizontal, vertical, and diagonal)
+//! * Text (characters)
 //!
 //! # Examples
 //!
-//! [todo]
+//! ```
+//! let mut display = ST7734::new_with_spi("/dev/spidev0.0", 25);
+//! display.set_orientation(&Orientation::Portrait);
+//! display.draw_rect(30, 30, 60, 70, &Color::from_default(DefaultColor::Blue));
+//! ```
 #[macro_use]
 extern crate num_derive;
 
@@ -35,7 +50,11 @@ use sysfs_gpio::{Direction, Pin};
 ///
 /// # Examples
 ///
-/// [todo]
+/// ```
+/// let mut display = ST7734::new_with_spi("/dev/spidev0.0", 25);
+/// display.set_orientation(&Orientation::Portrait);
+/// display.draw_rect(30, 30, 60, 70, &Color::from_default(DefaultColor::Blue));
+/// ```
 ///
 pub struct ST7734 {
     /// Reset pin.
@@ -138,6 +157,8 @@ impl ST7734 {
 
     /// Runs commands to initialize the display.
     fn init(&mut self) {
+        self.hard_reset();
+
         let init_commands: Vec<Command> = vec![
             Command {
                 instruction: Instruction::SWRESET,
@@ -210,6 +231,11 @@ impl ST7734 {
                 arguments: vec![],
             },
             Command {
+                instruction: Instruction::MADCTL,
+                delay: None,
+                arguments: vec![0x00],
+            },
+            Command {
                 instruction: Instruction::DISPON,
                 delay: None,
                 arguments: vec![],
@@ -229,6 +255,27 @@ impl ST7734 {
             .unwrap()
             .set_value(0)
             .expect("error while pulsing clock");
+    }
+
+    /// Resets the display using the rst pin.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// let display = ST7734::new(21, 24, 25, 23);
+    /// display.hard_reset();
+    /// ```
+    pub fn hard_reset(&self) {
+        if self.rst.is_some() {
+            self.rst
+                .unwrap()
+                .set_value(1)
+                .expect("error while resetting");
+            self.rst
+                .unwrap()
+                .set_value(0)
+                .expect("error while resetting");
+        }
     }
 
     /// Writes one byte to the display which can either be a command or data.

@@ -7,6 +7,7 @@ use st7735::ST7734;
 fn main() {
     let mut display = ST7734::new_with_spi("/dev/spidev0.0", 25);
     display.clear_screen();
+    display.set_orientation(&Orientation::Portrait);
     let color_red = Color::from_default(DefaultColor::Red);
     display.draw_horizontal_line(0, 128, 20, &color_red);
     display.draw_horizontal_line(0, 128, 140, &color_red);
