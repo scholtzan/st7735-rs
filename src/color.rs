@@ -55,5 +55,13 @@ pub enum DefaultColor {
     Red = 0xF800,
     Green = 0x0400,
     Blue = 0x001F,
-    // todo
+    Lime = 0x07E0,
+    Cyan = 0x07FF,
+    Magenta = 0xF81F,
+    Yellow = 0xFFE0,
+    Purple = 0x8010,
+    Navy = 0x0010,
+    Teal = 0x0410,
+    Olive = 0x8400,
+    Gray = 0x8410,
 }

@@ -15,7 +15,6 @@ pub mod fonts;
 
 use crate::color::{Color, DefaultColor};
 use crate::command::{Command, Instruction};
-use crate::fonts::font57::Font57;
 use crate::fonts::Font;
 use num;
 use num::integer::sqrt;
@@ -83,7 +82,7 @@ impl ST7734 {
         spi.configure(&options).expect("error configuring SPI");
 
         let dc_pin = Pin::new(dc);
-        dc_pin.set_direction(Direction::Out);
+        dc_pin.set_direction(Direction::Out).expect("error setting dc pin direction");
 
         let mut display = ST7734 {
             rst: None,
@@ -107,19 +106,19 @@ impl ST7734 {
     ///
     pub fn new(rst: Option<u64>, clk: u64, dc: u64, mosi: u64) -> ST7734 {
         let clk_pin = Pin::new(clk);
-        clk_pin.set_direction(Direction::Out);
+        clk_pin.set_direction(Direction::Out).expect("error setting clk pin direction");
         clk_pin.set_value(0).expect("error while setting clock 0");
 
         let dc_pin = Pin::new(dc);
-        dc_pin.set_direction(Direction::Out);
+        dc_pin.set_direction(Direction::Out).expect("error setting dc pin direction");
 
         let mosi_pin = Pin::new(mosi);
-        mosi_pin.set_direction(Direction::Out);
+        mosi_pin.set_direction(Direction::Out).expect("error setting mosi pin direction");
 
         let rst_pin = match rst {
             Some(r) => {
                 let pin = Pin::new(r);
-                pin.set_direction(Direction::Out);
+                pin.set_direction(Direction::Out).expect("error setting rst pin direction");
                 Some(pin)
             }
             None => None,
@@ -211,11 +210,6 @@ impl ST7734 {
                 arguments: vec![],
             },
             Command {
-                instruction: Instruction::MADCTL,
-                delay: None,
-                arguments: vec![0xC8],
-            },
-            Command {
                 instruction: Instruction::DISPON,
                 delay: None,
                 arguments: vec![],
@@ -250,11 +244,11 @@ impl ST7734 {
             .expect("error while writing byte");
 
         if let Some(ref mut spi) = self.spi {
-            spi.write(&[value]);
+            spi.write(&[value]).expect("error writing byte using SPI");
         } else {
             let mask = 0x80;
             for bit in 0..8 {
-                self.mosi.unwrap().set_value(value & (mask >> bit));
+                self.mosi.unwrap().set_value(value & (mask >> bit)).expect("error writing to mosi");
                 self.pulse_clock();
             }
         }
@@ -280,7 +274,7 @@ impl ST7734 {
                 for _ in 0..=repetitions {
                     byte_array = [&byte_array[..], &bytes[..]].concat()
                 }
-                spi.write(&byte_array);
+                spi.write(&byte_array).expect("error writing bulk");
             } else {
                 for _ in 0..=repetitions {
                     self.write_color(color);
@@ -330,7 +324,7 @@ impl ST7734 {
                 .unwrap()
                 .set_value(1)
                 .expect("error while writing byte");
-            spi.write(&[bytes[0], bytes[1]]);
+            spi.write(&[bytes[0], bytes[1]]).expect("error writing color");
         } else {
             self.write_byte(bytes[0], true);
             self.write_byte(bytes[1], true);
@@ -406,8 +400,6 @@ impl ST7734 {
     /// ```
     ///
     pub fn draw_rect(&mut self, x0: u16, y0: u16, x1: u16, y1: u16, color: &Color) {
-        let width = x1 - x0 + 1;
-        let height = y1 - y0 + 1;
         self.draw_horizontal_line(x0, x1, y0, color);
         self.draw_horizontal_line(x0, x1, y1, color);
         self.draw_vertical_line(x0, y0, y1, color);
@@ -530,10 +522,10 @@ impl ST7734 {
     /// display.draw_character(50, 20, 10, 0xFF0000, &Font57);
     /// ```
     ///
-    pub fn draw_character<F: Font>(&mut self, c: char, x: u16, y: u16, color: &Color, font: F) {
+    pub fn draw_character<F: Font>(&mut self, c: char, x: u16, y: u16, color: &Color, _font: F) {
         let character_data = <F as Font>::get_char(c);
 
-        let mut mask = 0x01;
+        let mask = 0x01;
 
         for row in 0..7 {
             for col in 0..5 {
