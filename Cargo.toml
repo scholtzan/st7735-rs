@@ -10,6 +10,9 @@ default-target = "arm-unknown-linux-gnueabi"
 readme = "README.md"
 documentation = "https://docs.rs/st7735"
 
+[package.metadata.docs.rs]
+rustdoc-args = ["--target=arm-unknown-linux-gnueabi"]
+
 [dependencies]
 spidev = "0.3.0"
 sysfs_gpio = "0.5"
