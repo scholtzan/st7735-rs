@@ -1,4 +1,5 @@
 pub mod font57;
+use alloc::vec::Vec;
 
 /// Font trait implemented by fonts that can be used to display text on the display.
 pub trait Font {

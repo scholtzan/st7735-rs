@@ -14,8 +14,11 @@ documentation = "https://docs.rs/st7735"
 rustdoc-args = ["--target=arm-unknown-linux-gnueabi"]
 
 [dependencies]
-spidev = "0.3.0"
-sysfs_gpio = "0.5"
+embedded-hal = "0.2.2"
 num-traits = "0.2"
 num-derive = "0.2"
 num = "0.2"
+void = "1.0.2"
+
+[dev-dependencies]
+linux-embedded-hal = "0.2.2"

@@ -1,4 +1,5 @@
 use crate::fonts::Font;
+use alloc::vec::Vec;
 
 /// Font displaying characters in 5x7 pixels.
 pub struct Font57 {}

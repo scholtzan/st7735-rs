@@ -1,3 +1,5 @@
+use alloc::vec::Vec;
+
 /// System function command.
 pub struct Command {
     /// Instruction to be executed.
