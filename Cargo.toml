@@ -6,19 +6,14 @@ authors = ["Anna Scholtz <anna@scholtzan.net>"]
 edition = "2018"
 license = "MIT"
 repository = "https://github.com/scholtzan/st7735-rs"
-default-target = "arm-unknown-linux-gnueabi"
 readme = "README.md"
 documentation = "https://docs.rs/st7735"
-
-[package.metadata.docs.rs]
-rustdoc-args = ["--target=arm-unknown-linux-gnueabi"]
 
 [dependencies]
 embedded-hal = "0.2.2"
 num-traits = "0.2"
 num-derive = "0.2"
 num = "0.2"
-void = "1.0.2"
 
 [dev-dependencies]
 linux-embedded-hal = "0.2.2"

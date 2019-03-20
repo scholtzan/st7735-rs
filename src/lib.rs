@@ -47,7 +47,6 @@ use num;
 use num::integer::sqrt;
 use core::cmp::{max, min};
 use core::mem::transmute;
-use void::Void;
 
 /// ST7735 driver to connect to TFT displays. The driver allows to draw simple shapes,
 /// and reset the display.
@@ -244,7 +243,7 @@ where
         }
 
         if let Some(ref mut spi) = self.spi {
-            spi.write(&[value]);
+            let _ = spi.write(&[value]);
         } else {
             let mask = 0x80;
             for bit in 0..8 {
@@ -279,7 +278,7 @@ where
                 for _ in 0..=repetitions {
                     byte_array = [&byte_array[..], &bytes[..]].concat()
                 }
-                spi.write(&byte_array);
+                let _ = spi.write(&byte_array);
             } else {
                 for _ in 0..=repetitions {
                     self.write_color(color);
@@ -329,7 +328,7 @@ where
                 dc.set_high();
             }
 
-            spi.write(&[bytes[0], bytes[1]]);
+            let _ = spi.write(&[bytes[0], bytes[1]]);
         } else {
             self.write_byte(bytes[0], true);
             self.write_byte(bytes[1], true);

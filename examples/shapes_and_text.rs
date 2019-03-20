@@ -3,7 +3,7 @@ use st7735::color::{Color, DefaultColor};
 use st7735::fonts::font57::Font57;
 use st7735::Orientation;
 use st7735::ST7734;
-use linux_embedded_hal::spidev::{SpidevOptions, SpidevTransfer, SPI_MODE_0};
+use linux_embedded_hal::spidev::{SpidevOptions, SPI_MODE_0};
 use linux_embedded_hal::Spidev;
 use linux_embedded_hal::Delay;
 use linux_embedded_hal::Pin;
