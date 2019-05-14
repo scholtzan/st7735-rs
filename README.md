@@ -99,7 +99,7 @@ For more details about installing required tools and setting up everything to bu
 
 ## Resources
 
-This crate is based on the series [_Add a TFT Display to the Raspberry Pi_](http://w8bh.net/pi/TFT1.pdf]) by Bruce E. Hall and the [Adafruit-ST7735-Library
+This crate is based on the series [_Add a TFT Display to the Raspberry Pi_](http://w8bh.net/pi/TFT1.pdf) by Bruce E. Hall and the [Adafruit-ST7735-Library
 ](https://github.com/adafruit/Adafruit-ST7735-Library).
 
 ## Contributing
